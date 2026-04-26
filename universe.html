@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MCU App — Universe</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons" />
+</head>
+<body>
+
+<header>
+  <div class="header-left">
+    <button class="hamburger" id="hamburger" onclick="toggleMobileNav()">
+      <span class="material-icons">menu</span>
+    </button>
+    <a class="brand" href="index.html">MCU App</a>
+    <nav>
+      <a href="index.html">Main</a>
+      <a href="phases.html">Phases</a>
+      <a href="collections.html">Collections</a>
+      <a href="database.html">Database</a>
+    </nav>
+  </div>
+  <div class="header-right">
+    <span class="watched-counter" id="watchedCounter" style="display:none;" onclick="window.location='profile.html'"></span>
+    <div class="user-menu" id="userMenu">
+      <span class="header-username" id="headerUsername" onclick="toggleUserMenu()"></span>
+      <div class="user-dropdown" id="userDropdown">
+        <button onclick="window.location='profile.html'">Profile</button>
+        <button onclick="event.stopPropagation();showLogoutModal()">Log out</button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<div class="mobile-nav-backdrop" id="mobileNavBackdrop" onclick="closeMobileNav()"></div>
+<nav class="mobile-nav" id="mobileNav">
+  <div class="mobile-nav-close"><button onclick="closeMobileNav()"><span class="material-icons">close</span></button></div>
+  <a href="index.html">Main</a>
+  <a href="phases.html">Phases</a>
+  <a href="collections.html">Collections</a>
+  <a href="database.html">Database</a>
+</nav>
+
+<!-- Login modal -->
+<div class="login-overlay" id="loginOverlay">
+  <div class="login-box">
+    <h2>MCU App</h2>
+    <input type="text" id="loginUsername" placeholder="Username" autocomplete="username" />
+    <input type="password" id="loginPassword" placeholder="Password" autocomplete="current-password" />
+    <button onclick="handleLogin()">Sign in</button>
+    <div class="login-error" id="loginError">Incorrect username or password.</div>
+  </div>
+</div>
+
+<!-- Movie modal -->
+<div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
+  <div class="modal">
+    <button class="close-btn" onclick="closeModalBtn()"><span class="close-x">✕</span><span class="close-label"> Close</span></button>
+    <h2 id="modalTitle"></h2>
+    <div class="modal-meta" id="modalMeta"></div>
+    <div class="modal-watched-footer" id="modalWatchedFooter"></div>
+  </div>
+</div>
+<button class="modal-bottom-bar" id="modalBottomBar" style="display:none;" onclick="toggleWatched(this.dataset.watchedId)"></button>
+
+<div style="padding: 24px 24px 0;">
+  <a href="profile.html" style="color:#fff;font-size:0.85rem;text-decoration:none;display:inline-flex;align-items:center;gap:4px;"><span class="material-icons" style="font-size:18px;">arrow_back</span> Back to Profile</a>
+  <h1 id="universeTitle" style="font-size:1.6rem;color:#fff;margin-top:8px;"></h1>
+</div>
+
+<div class="controls">
+  <input type="text" id="search" placeholder="Search titles..." oninput="renderCards()" />
+  <select id="sortOrder" onchange="renderCards()" style="margin-left:auto;">
+    <option value="asc" selected>Oldest</option>
+    <option value="desc">Newest</option>
+  </select>
+  <div class="view-toggle">
+    <button id="btnCard" class="active" onclick="setView('card')" title="Card view">⊞</button>
+    <button id="btnList" onclick="setView('list')" title="List view">☰</button>
+  </div>
+</div>
+
+<div class="status" id="status">Loading...</div>
+<div class="grid" id="grid"></div>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="js/config.js"></script>
+<script src="js/users.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/data.js"></script>
+<script src="js/firebase.js"></script>
+<script>
+  // Read universe or type from URL
+  // e.g. universe.html?universe=MCU or universe.html?type=Movie
+  const params = new URLSearchParams(window.location.search);
+  const UNIVERSE = params.get('universe') || '';
+  const TYPE     = params.get('type') || '';
+
+  function onLoginSuccess() { loadWatched().then(refreshWatchedUI); init(); }
+
+  // ─── Modal ───
+  async function openModal(id) {
+    const m = allMovies.find(x => x.ID === id);
+    if (!m) return;
+    const posterUrl = await getPosterUrl(m, 'w500');
+    const cols = movieCollectionMap[m.ID] || [];
+
+    document.getElementById('modalMeta').innerHTML = `
+      ${posterUrl ? `<img src="${posterUrl}" alt="${m.Title}">` : ''}
+      <div class="modal-title-row"><span class="modal-title-inline">${m.Title}</span></div>
+      ${m.Universe ? `<div><strong>Universe:</strong> ${m.Universe}</div>` : ''}
+      ${m.Phase ? `<div><strong>Phase:</strong> <a href="phases.html#${m.Phase.toLowerCase().replace(/\s+/g,'-')}" style="color:#60a5fa;text-decoration:none;">${m.Phase}</a></div>` : ''}
+      ${m.Type ? `<div><strong>Type:</strong> ${getTypeLabel(m)}</div>` : ''}
+      ${m.Season ? `<div><strong>Season:</strong> ${m.Season}</div>` : ''}
+      ${m['Release Date'] ? `<div><strong>Release Date:</strong> ${m['Release Date']}</div>` : ''}
+      ${getCountdown(m) ? `<div style="color:#e50914;font-weight:bold;">${getCountdown(m)}</div>` : ''}
+      ${cols.length > 0 ? `
+        <div style="margin-top:14px;padding-top:12px;border-top:1px solid #333;display:flex;flex-wrap:wrap;gap:6px;">
+          <div style="width:100%;"><strong>Collections:</strong></div>
+          ${cols.map(col => `
+            <button class="modal-collection-btn" onclick="window.location='collections.html#collection=${col.slug || col.gid}'">
+              ${col.name}
+            </button>
+          `).join('')}
+        </div>` : ''}
+    `;
+    renderModalWatchedFooter(id);
+    document.getElementById('modalOverlay').classList.add('open');
+    setModalBottomBar(id);
+  }
+
+  function closeModal(e) { if (e.target === document.getElementById('modalOverlay')) closeModalBtn(); }
+  function closeModalBtn() { document.getElementById('modalOverlay').classList.remove('open'); hideModalBottomBar(); }
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModalBtn(); });
+
+  // ─── Poster loading ───
+  async function loadVisiblePosters() {
+    for (const el of Array.from(document.querySelectorAll('.poster-placeholder'))) {
+      const { movieid, cardkey } = el.dataset;
+      const m = allMovies.find(x => x.ID === movieid);
+      if (!m) continue;
+      const url = await getPosterUrl(m, 'w300');
+      const current = document.querySelector(`.poster-placeholder[data-cardkey="${cardkey}"]`);
+      if (!current) continue;
+      if (url) {
+        const img = document.createElement('img');
+        img.className = 'poster';
+        img.src = url;
+        img.alt = m.Title;
+        img.loading = 'lazy';
+        current.replaceWith(img);
+      } else {
+        current.textContent = '🎬';
+      }
+    }
+  }
+
+  // ─── Cards ───
+  function renderCards() {
+    const search = document.getElementById('search').value.toLowerCase();
+    const sort   = document.getElementById('sortOrder').value;
+
+    const ANIMATED_TYPES = new Set(['Animated Series', 'Animated Movie']);
+    let list = allMovies.filter(m => {
+      if (UNIVERSE && m.Universe !== UNIVERSE) return false;
+      if (TYPE) {
+        if (TYPE === 'Animated') {
+          if (!ANIMATED_TYPES.has(m.Type)) return false;
+        } else if (getTypeLabel(m) !== TYPE) return false;
+      }
+      if (search && !m.Title.toLowerCase().includes(search)) return false;
+      return true;
+    });
+
+    list.sort((a, b) => {
+      const da = new Date(a['Release Date']);
+      const db = new Date(b['Release Date']);
+      const va = isNaN(da) ? 0 : da.getTime();
+      const vb = isNaN(db) ? 0 : db.getTime();
+      return sort === 'desc' ? vb - va : va - vb;
+    });
+
+    const status = document.getElementById('status');
+    status.textContent = `${list.length} entries`;
+
+    const grid = document.getElementById('grid');
+    if (list.length === 0) {
+      grid.innerHTML = '<div class="empty">No results found.</div>';
+      return;
+    }
+
+    grid.innerHTML = list.map(m => {
+      const tv = isTV(m);
+      const imageId     = getImageId(m);
+      const cachedLocal = posterCache[`local_${imageId}_w300`];
+      const cachedTmdb  = posterCache[`tmdb_${m.Title}_w300`];
+      const cachedUrl   = cachedLocal ? `images/${imageId}_w300.jpg` : (cachedTmdb || null);
+      const posterHtml  = cachedUrl
+        ? `<img class="poster" src="${cachedUrl}" alt="${m.Title}" loading="lazy">`
+        : `<div class="poster-placeholder" data-movieid="${m.ID}" data-cardkey="${m.ID}">🎬</div>`;
+      return `
+        <div class="card" onclick="openModal('${m.ID}')">
+          <div class="poster-wrap">${posterHtml}${watchedCardButtonHTML(m.ID)}</div>
+          <div class="card-info">
+            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;">
+              ${m.ID === recentReleaseId ? `<div class="badge recent-release" style="margin-bottom:0;">Recent Release</div>` : ''}
+              ${isUpcoming(m) ? `<div class="badge upcoming" style="margin-bottom:0;">Upcoming</div>` : ''}
+              ${(tv && m.Season) ? `<div class="badge season" style="margin-bottom:0;">${m.Season}</div>` : ''}
+            </div>
+            <h3>${m.Title}</h3>
+            <div class="meta">
+              ${m['Release Date'] ? `<span>${m['Release Date']}</span>` : ''}
+            </div>
+            ${getCountdown(m) ? `<p class="countdown">${getCountdown(m)}</p>` : ''}
+            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">
+              ${m.Type ? `<span class="type-tag">${getTypeLabel(m)}</span>` : ''}
+              ${m.Phase ? `<a href="phases.html#${m.Phase.toLowerCase().replace(/\s+/g,'-')}" onclick="event.stopPropagation()" class="type-tag type-tag-link">${m.Phase}</a>` : ''}
+            </div>
+          </div>
+          ${watchedCardSideButtonHTML(m.ID)}
+        </div>
+      `;
+    }).join('');
+
+    loadVisiblePosters();
+  }
+
+  function setView(view) {
+    const grid = document.getElementById('grid');
+    grid.classList.toggle('list-view', view === 'list');
+    document.getElementById('btnCard').classList.toggle('active', view === 'card');
+    document.getElementById('btnList').classList.toggle('active', view === 'list');
+  }
+
+  async function init() {
+    // Set page title from params
+    const pageLabel = UNIVERSE || TYPE || 'All';
+    document.title = `MCU App — ${pageLabel}`;
+    const titleEl = document.getElementById('universeTitle');
+    if (titleEl) titleEl.textContent = pageLabel;
+
+    try {
+      await initData();
+      loadAllCollections();
+      renderCards();
+      refreshWatchedUI();
+    } catch(err) {
+      document.getElementById('status').textContent = 'Error loading data.';
+      console.error(err);
+    }
+  }
+
+  requireAuth();
+  loadWatched().then(refreshWatchedUI);
+  init();
+</script>
+
+<footer>
+  <div>
+    <span class="footer-brand">MCU App</span>
+    <span class="footer-copy">Created by Kristijan Korman · Posters from TMDB</span>
+  </div>
+  <div class="footer-links">
+    <a href="index.html">Main</a>
+    <a href="phases.html">Phases</a>
+    <a href="collections.html">Collections</a>
+    <a href="database.html">Database</a>
+  </div>
+  <div class="footer-quote">
+    Assembled with love, coffee, and questionable life choices.<br>
+    Not affiliated with Marvel. Please don't sue.
+  </div>
+</footer>
+</body>
+</html>

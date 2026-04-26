@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MCU App — Database</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons" />
+  <style>
+    /* ── Mobile filter button ── */
+    .mobile-filter-btn {
+      display: none;
+      align-items: center;
+      gap: 6px;
+      background: #222;
+      border: 1px solid #444;
+      color: #eee;
+      padding: 7px 12px;
+      border-radius: 4px;
+      font-size: 0.85rem;
+      cursor: pointer;
+      position: relative;
+    }
+    .mobile-filter-btn .material-icons { font-size: 18px; }
+    .mobile-filter-btn.active { border-color: #e50914; color: #fff; }
+
+    .mobile-filter-badge {
+      position: absolute;
+      top: -6px;
+      right: -6px;
+      background: #e50914;
+      color: #fff;
+      font-size: 0.65rem;
+      font-weight: bold;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    @media (max-width: 600px) {
+      .desktop-filter { display: none !important; }
+      .mobile-filter-btn { display: flex; }
+      /* on mobile, search takes all remaining space */
+      .controls #search { flex: 1; }
+      /* push view toggle to far right */
+      .controls .view-toggle { margin-left: auto; }
+    }
+
+    /* ── Filter bottom sheet ── */
+    .filter-sheet-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.6);
+      z-index: 300;
+    }
+    .filter-sheet-backdrop.open { display: block; }
+
+    .filter-sheet {
+      position: fixed;
+      bottom: -100%;
+      left: 0;
+      right: 0;
+      background: #1a1a1a;
+      border-radius: 16px 16px 0 0;
+      border-top: 1px solid #333;
+      z-index: 301;
+      padding: 0 0 32px;
+      transition: bottom 0.3s ease;
+      max-height: 85vh;
+      overflow-y: auto;
+    }
+    .filter-sheet.open { bottom: 0; }
+
+    .filter-sheet-handle {
+      width: 36px;
+      height: 4px;
+      background: #444;
+      border-radius: 2px;
+      margin: 12px auto 0;
+    }
+
+    .filter-sheet-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 20px 12px;
+      border-bottom: 1px solid #2a2a2a;
+    }
+    .filter-sheet-header span {
+      font-size: 1rem;
+      font-weight: bold;
+      color: #fff;
+    }
+    .filter-sheet-header button {
+      background: none;
+      border: none;
+      color: #e50914;
+      font-size: 0.85rem;
+      cursor: pointer;
+      padding: 0;
+    }
+
+    .filter-sheet-body {
+      padding: 8px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .filter-sheet-group {
+      padding: 12px 0;
+      border-bottom: 1px solid #2a2a2a;
+    }
+    .filter-sheet-group:last-child { border-bottom: none; }
+
+    .filter-sheet-group label {
+      display: block;
+      font-size: 0.75rem;
+      color: #888;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 8px;
+    }
+
+    .filter-sheet-group select {
+      width: 100%;
+      background: #222;
+      border: 1px solid #444;
+      color: #eee;
+      padding: 10px 12px;
+      border-radius: 6px;
+      font-size: 0.9rem;
+    }
+    .filter-sheet-group select:focus { outline: none; border-color: #e50914; }
+
+    .filter-sheet-footer {
+      padding: 16px 20px 0;
+    }
+    .filter-sheet-footer button {
+      width: 100%;
+      background: #e50914;
+      border: none;
+      color: #fff;
+      padding: 14px;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    .filter-sheet-footer button:hover { background: #c0070f; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="header-left">
+    <button class="hamburger" id="hamburger" onclick="toggleMobileNav()">
+      <span class="material-icons">menu</span>
+    </button>
+    <a class="brand" href="index.html">MCU App</a>
+    <nav>
+      <a href="index.html">Main</a>
+      <a href="phases.html">Phases</a>
+      <a href="collections.html">Collections</a>
+      <a href="database.html" class="active">Database</a>
+    </nav>
+  </div>
+  <div class="header-right">
+    <span class="watched-counter" id="watchedCounter" style="display:none;" onclick="window.location='profile.html'"></span>
+    <div class="user-menu" id="userMenu">
+      <span class="header-username" id="headerUsername" onclick="toggleUserMenu()"></span>
+      <div class="user-dropdown" id="userDropdown">
+        <button onclick="event.stopPropagation();showLogoutModal()">Log out</button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<div class="mobile-nav-backdrop" id="mobileNavBackdrop" onclick="closeMobileNav()"></div>
+<nav class="mobile-nav" id="mobileNav">
+  <div class="mobile-nav-close"><button onclick="closeMobileNav()"><span class="material-icons">close</span></button></div>
+  <a href="index.html">Main</a>
+  <a href="phases.html">Phases</a>
+  <a href="collections.html">Collections</a>
+  <a href="database.html" class="active">Database</a>
+</nav>
+
+<div class="controls">
+  <input type="text" id="search" placeholder="Search titles..." oninput="renderCards()" />
+  <!-- Desktop filters -->
+  <select id="filterUniverse" onchange="updateFilterBadge();renderCards()" class="desktop-filter">
+    <option value="">All Universes</option>
+  </select>
+  <select id="filterPhase" onchange="updateFilterBadge();renderCards()" class="desktop-filter">
+    <option value="">All Phases</option>
+  </select>
+  <select id="filterType" onchange="updateFilterBadge();renderCards()" class="desktop-filter">
+    <option value="">All Types</option>
+  </select>
+  <select id="sortOrder" onchange="renderCards()" class="desktop-filter" style="margin-left:auto;">
+    <option value="asc" selected>Oldest</option>
+    <option value="desc">Newest</option>
+  </select>
+  <!-- Mobile filter button -->
+  <button class="mobile-filter-btn" id="mobileFilterBtn" onclick="openFilterSheet()">
+    <span class="material-icons">tune</span>
+    <span>Filters</span>
+    <span class="mobile-filter-badge" id="mobileFilterBadge" style="display:none;"></span>
+  </button>
+  <div class="view-toggle" style="margin-left:auto;">
+    <button id="btnCard" class="active" onclick="setView('card')" title="Card view">⊞</button>
+    <button id="btnList" onclick="setView('list')" title="List view">☰</button>
+  </div>
+</div>
+
+<!-- Mobile filter bottom sheet -->
+<div class="filter-sheet-backdrop" id="filterSheetBackdrop" onclick="closeFilterSheet()"></div>
+<div class="filter-sheet" id="filterSheet">
+  <div class="filter-sheet-handle"></div>
+  <div class="filter-sheet-header">
+    <span>Filters</span>
+    <button onclick="clearFilters()">Clear all</button>
+  </div>
+  <div class="filter-sheet-body">
+    <div class="filter-sheet-group">
+      <label>Universe</label>
+      <select id="filterUniverseMobile" onchange="syncAndRender('filterUniverse','filterUniverseMobile')">
+        <option value="">All Universes</option>
+      </select>
+    </div>
+    <div class="filter-sheet-group">
+      <label>Phase</label>
+      <select id="filterPhaseMobile" onchange="syncAndRender('filterPhase','filterPhaseMobile')">
+        <option value="">All Phases</option>
+      </select>
+    </div>
+    <div class="filter-sheet-group">
+      <label>Type</label>
+      <select id="filterTypeMobile" onchange="syncAndRender('filterType','filterTypeMobile')">
+        <option value="">All Types</option>
+      </select>
+    </div>
+    <div class="filter-sheet-group">
+      <label>Sort order</label>
+      <select id="sortOrderMobile" onchange="syncAndRender('sortOrder','sortOrderMobile')">
+        <option value="asc">Oldest first</option>
+        <option value="desc">Newest first</option>
+      </select>
+    </div>
+  </div>
+  <div class="filter-sheet-footer">
+    <button onclick="closeFilterSheet()">Show results</button>
+  </div>
+</div>
+
+<div class="status" id="status">Loading...</div>
+<div id="collectionHeader" style="display:none; padding: 16px 24px 0;">
+  <button onclick="backToAll()" style="background:none;border:none;color:#fff;font-size:0.85rem;cursor:pointer;padding:0;margin-bottom:8px;display:inline-flex;align-items:center;gap:4px;"><span class="material-icons" style="font-size:18px;">arrow_back</span> Back to all content</button>
+  <div class="collection-title" id="collectionTitle"></div>
+</div>
+<div class="grid" id="grid"></div>
+
+<!-- Movie modal -->
+<div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
+  <div class="modal">
+    <button class="close-btn" onclick="closeModalBtn()"><span class="close-x">✕</span><span class="close-label"> Close</span></button>
+    <h2 id="modalTitle"></h2>
+    <div class="modal-meta" id="modalMeta"></div>
+    <div class="modal-watched-footer" id="modalWatchedFooter"></div>
+  </div>
+</div>
+<button class="modal-bottom-bar" id="modalBottomBar" style="display:none;" onclick="toggleWatched(this.dataset.watchedId)"></button>
+
+<!-- Login modal -->
+<div class="login-overlay" id="loginOverlay">
+  <div class="login-box">
+    <h2>MCU App</h2>
+    <input type="text" id="loginUsername" placeholder="Username" autocomplete="username" />
+    <input type="password" id="loginPassword" placeholder="Password" autocomplete="current-password" />
+    <button onclick="handleLogin()">Sign in</button>
+    <div class="login-error" id="loginError">Incorrect username or password.</div>
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="js/config.js"></script>
+<script src="js/users.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/data.js"></script>
+<script src="js/firebase.js"></script>
+<script>
+  let activeCollectionIds = null;
+
+  function onLoginSuccess() { loadWatched().then(refreshWatchedUI); init(); }
+
+  function populateFilters(movies) {
+    const universes = [...new Set(movies.map(m => m.Universe).filter(Boolean))].sort();
+    const phases    = [...new Set(movies.map(m => m.Phase).filter(Boolean))].sort();
+    const types     = [...new Set(movies.map(m => getTypeLabel(m)).filter(Boolean))].sort();
+
+    // Populate desktop selects
+    const uSel = document.getElementById('filterUniverse');
+    universes.forEach(u => { const o = document.createElement('option'); o.value = u; o.textContent = u; uSel.appendChild(o); });
+    const pSel = document.getElementById('filterPhase');
+    phases.forEach(p => { const o = document.createElement('option'); o.value = p; o.textContent = p; pSel.appendChild(o); });
+    const tSel = document.getElementById('filterType');
+    types.forEach(t => { const o = document.createElement('option'); o.value = t; o.textContent = t; tSel.appendChild(o); });
+
+    // Mirror into mobile selects
+    const uSelM = document.getElementById('filterUniverseMobile');
+    universes.forEach(u => { const o = document.createElement('option'); o.value = u; o.textContent = u; uSelM.appendChild(o); });
+    const pSelM = document.getElementById('filterPhaseMobile');
+    phases.forEach(p => { const o = document.createElement('option'); o.value = p; o.textContent = p; pSelM.appendChild(o); });
+    const tSelM = document.getElementById('filterTypeMobile');
+    types.forEach(t => { const o = document.createElement('option'); o.value = t; o.textContent = t; tSelM.appendChild(o); });
+  }
+
+  // Sync desktop ↔ mobile selects and re-render
+  function syncAndRender(desktopId, mobileId) {
+    const val = document.getElementById(mobileId).value;
+    document.getElementById(desktopId).value = val;
+    updateFilterBadge();
+    renderCards();
+  }
+
+  function openFilterSheet() {
+    // Sync mobile selects from desktop values before opening
+    document.getElementById('filterUniverseMobile').value = document.getElementById('filterUniverse').value;
+    document.getElementById('filterPhaseMobile').value    = document.getElementById('filterPhase').value;
+    document.getElementById('filterTypeMobile').value     = document.getElementById('filterType').value;
+    document.getElementById('sortOrderMobile').value      = document.getElementById('sortOrder').value;
+    document.getElementById('filterSheet').classList.add('open');
+    document.getElementById('filterSheetBackdrop').classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+
+  function closeFilterSheet() {
+    document.getElementById('filterSheet').classList.remove('open');
+    document.getElementById('filterSheetBackdrop').classList.remove('open');
+    document.body.style.overflow = '';
+  }
+
+  function clearFilters() {
+    ['filterUniverse','filterPhase','filterType'].forEach(id => {
+      document.getElementById(id).value = '';
+      document.getElementById(id + 'Mobile').value = '';
+    });
+    document.getElementById('sortOrder').value = 'asc';
+    document.getElementById('sortOrderMobile').value = 'asc';
+    updateFilterBadge();
+    renderCards();
+  }
+
+  function updateFilterBadge() {
+    const active = ['filterUniverse','filterPhase','filterType']
+      .filter(id => document.getElementById(id).value).length;
+    const badge = document.getElementById('mobileFilterBadge');
+    const btn   = document.getElementById('mobileFilterBtn');
+    if (active > 0) {
+      badge.textContent = active;
+      badge.style.display = 'flex';
+      btn.classList.add('active');
+    } else {
+      badge.style.display = 'none';
+      btn.classList.remove('active');
+    }
+  }
+
+  async function onCollectionChange() {
+    const sel  = document.getElementById('filterCollection');
+    const gid  = sel.value;
+    const name = sel.options[sel.selectedIndex].text;
+
+    sel.classList.toggle('active', !!gid);
+
+    if (!gid) {
+      activeCollectionIds = null;
+      document.getElementById('collectionHeader').style.display = 'none';
+      document.getElementById('collectionTitle').textContent = '';
+      document.getElementById('status').style.display = '';
+      document.querySelector('.controls').style.display = '';
+      history.replaceState(null, '', window.location.pathname);
+      renderCards();
+      return;
+    }
+
+    // Update URL with pretty slug
+    const col = COLLECTIONS.find(c => c.gid === gid);
+    if (col) history.replaceState(null, '', `#collection=${col.slug}`);
+
+    document.querySelector('.controls').style.display = 'none';
+    document.getElementById('status').style.display = 'none';
+    document.getElementById('collectionHeader').style.display = 'block';
+    try {
+      activeCollectionIds = await loadCollection(gid);
+      document.getElementById('collectionTitle').textContent = name;
+      renderCards();
+    } catch(e) {
+      console.error(e);
+    }
+  }
+
+  function backToAll() {
+    document.getElementById('filterCollection').value = '';
+    onCollectionChange();
+  }
+
+  async function switchToCollection(gid, name) {
+    closeModalBtn();
+    document.getElementById('filterCollection').value = gid;
+    await onCollectionChange();
+  }
+
+  async function loadVisiblePosters() {
+    for (const el of Array.from(document.querySelectorAll('.poster-placeholder'))) {
+      const { movieid, cardkey } = el.dataset;
+      const m = allMovies.find(x => x.ID === movieid);
+      if (!m) continue;
+      const url = await getPosterUrl(m, 'w300');
+      const current = document.querySelector(`.poster-placeholder[data-cardkey="${cardkey}"]`);
+      if (!current) continue;
+      if (url) {
+        const img = document.createElement('img');
+        img.className = 'poster';
+        img.src = url;
+        img.alt = m.Title;
+        img.loading = 'lazy';
+        current.replaceWith(img);
+      } else {
+        current.textContent = '🎬';
+      }
+    }
+  }
+
+  function renderCards() {
+    const search   = document.getElementById('search').value.toLowerCase();
+    const universe = document.getElementById('filterUniverse').value;
+    const phase    = document.getElementById('filterPhase').value;
+    const type     = document.getElementById('filterType').value;
+    const sort     = document.getElementById('sortOrder').value;
+
+    // Persist user preferences
+    saveSetting('database', 'filterUniverse', universe);
+    saveSetting('database', 'filterPhase', phase);
+    saveSetting('database', 'filterType', type);
+    saveSetting('database', 'sortOrder', sort);
+
+    let displayList;
+    if (activeCollectionIds) {
+      displayList = activeCollectionIds
+        .map(entry => {
+          const m = allMovies.find(x => x.ID === entry.id);
+          if (!m) return null;
+          if (search && !m.Title.toLowerCase().includes(search)) return null;
+          if (universe && m.Universe !== universe) return null;
+          if (phase && m.Phase !== phase) return null;
+          if (type && getTypeLabel(m) !== type) return null;
+          return { m, desc: entry.desc, key: entry.key };
+        })
+        .filter(Boolean);
+    } else {
+      displayList = allMovies
+        .filter(m => {
+          if (search && !m.Title.toLowerCase().includes(search)) return false;
+          if (universe && m.Universe !== universe) return false;
+          if (phase && m.Phase !== phase) return false;
+          if (type && getTypeLabel(m) !== type) return false;
+          return true;
+        })
+        .map(m => ({ m, desc: '', key: m.ID }));
+
+      // Sort by release date
+      displayList.sort((a, b) => {
+        const da = new Date(a.m['Release Date']);
+        const db = new Date(b.m['Release Date']);
+        const va = isNaN(da) ? 0 : da.getTime();
+        const vb = isNaN(db) ? 0 : db.getTime();
+        return sort === 'desc' ? vb - va : va - vb;
+      });
+    }
+
+    const grid   = document.getElementById('grid');
+    const status = document.getElementById('status');
+    if (!activeCollectionIds) {
+      status.style.display = '';
+      status.textContent = `Showing ${displayList.length} of ${allMovies.length} entries`;
+    }
+
+    if (displayList.length === 0) {
+      grid.innerHTML = '<div class="empty">No results found.</div>';
+      return;
+    }
+
+    grid.innerHTML = displayList.map(({ m, desc, key }) => {
+      const tv = isTV(m);
+      const imageId    = getImageId(m);
+      const cachedLocal = posterCache[`local_${imageId}_w300`];
+      const cachedTmdb  = posterCache[`tmdb_${m.Title}_w300`];
+      const cachedUrl   = cachedLocal ? `images/${imageId}_w300.jpg` : (cachedTmdb || null);
+      const posterHtml  = cachedUrl
+        ? `<img class="poster" src="${cachedUrl}" alt="${m.Title}" loading="lazy">`
+        : `<div class="poster-placeholder" data-movieid="${m.ID}" data-cardkey="${key}">🎬</div>`;
+      return `
+        <div class="card" onclick="openModal('${m.ID}', \`${desc.replace(/`/g, "'")}\`)">
+          <div class="poster-wrap">${posterHtml}${watchedCardButtonHTML(m.ID)}</div>
+          <div class="card-info">
+            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;">
+              ${m.ID === recentReleaseId ? `<div class="badge recent-release" style="margin-bottom:0;">Recent Release</div>` : ''}
+              ${isUpcoming(m) ? `<div class="badge upcoming" style="margin-bottom:0;">Upcoming</div>` : ''}
+              ${m.Universe ? `<div class="badge ${getBadgeClass(m.Universe)}" style="margin-bottom:0;">${m.Universe}</div>` : ''}
+              ${(tv && m.Season) ? `<div class="badge season" style="margin-bottom:0;">${m.Season}</div>` : ''}
+            </div>
+            <h3>${m.Title}</h3>
+            <div class="meta">
+              ${m['Release Date'] ? `<span>${m['Release Date']}</span>` : ''}
+            </div>
+            ${getCountdown(m) ? `<p class="countdown">${getCountdown(m)}</p>` : ''}
+            ${desc ? `<p class="card-desc">${desc}</p>` : ''}
+            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">
+              ${m.Type ? `<span class="type-tag">${getTypeLabel(m)}</span>` : ''}
+              ${m.Phase ? `<a href="phases.html#${m.Phase.toLowerCase().replace(/\s+/g, '-')}" onclick="event.stopPropagation()" class="type-tag type-tag-link">${m.Phase}</a>` : ''}
+            </div>
+          </div>
+          ${watchedCardSideButtonHTML(m.ID)}
+        </div>
+      `;
+    }).join('');
+
+    loadVisiblePosters();
+  }
+
+  async function openModal(id, desc = '') {
+    const m = allMovies.find(x => x.ID === id);
+    if (!m) return;
+    const posterUrl = await getPosterUrl(m, 'w500');
+
+    document.getElementById('modalMeta').innerHTML = `
+      ${posterUrl ? `<img src="${posterUrl}" alt="${m.Title}">` : ''}
+      <div class="modal-title-row"><span class="modal-title-inline">${m.Title}</span></div>
+      ${m.Universe ? `<div><strong>Universe:</strong> ${m.Universe}</div>` : ''}
+      ${m.Phase ? `<div><strong>Phase:</strong> <a href="phases.html#${m.Phase.toLowerCase().replace(/\s+/g, '-')}" style="color:#60a5fa;text-decoration:none;">${m.Phase}</a></div>` : ''}
+      ${m.Type ? `<div><strong>Type:</strong> ${getTypeLabel(m)}</div>` : ''}
+      ${m.Season ? `<div><strong>Season:</strong> ${m.Season}</div>` : ''}
+      ${m['Release Date'] ? `<div><strong>Release Date:</strong> ${m['Release Date']}</div>` : ''}
+      ${getCountdown(m) ? `<div style="color:#e50914;font-weight:bold;">${getCountdown(m)}</div>` : ''}
+      ${desc ? `<div style="margin-top:12px;padding-top:12px;border-top:1px solid #333;color:#ccc;line-height:1.5;">${desc}</div>` : ''}
+      ${(movieCollectionMap[m.ID] && movieCollectionMap[m.ID].length > 0) ? `
+        <div style="margin-top:14px;padding-top:12px;border-top:1px solid #333;display:flex;flex-wrap:wrap;gap:6px;">
+          <div style="width:100%;"><strong>Collections:</strong></div>
+          ${movieCollectionMap[m.ID].map(col => `
+            <button class="modal-collection-btn" onclick="window.location='collections.html#collection=${col.slug || col.gid}'">
+              ${col.name}
+            </button>
+          `).join('')}
+        </div>` : ''}
+    `;
+    renderModalWatchedFooter(id);
+    document.getElementById('modalOverlay').classList.add('open');
+    setModalBottomBar(id);
+  }
+
+  function setView(view) {
+    const grid = document.getElementById('grid');
+    grid.classList.toggle('list-view', view === 'list');
+    document.getElementById('btnCard').classList.toggle('active', view === 'card');
+    document.getElementById('btnList').classList.toggle('active', view === 'list');
+  }
+
+  function closeModal(e) {
+    if (e.target === document.getElementById('modalOverlay')) closeModalBtn();
+  }
+
+  function closeModalBtn() {
+    document.getElementById('modalOverlay').classList.remove('open');
+    hideModalBottomBar();
+  }
+
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModalBtn(); });
+
+  async function init() {
+    try {
+      await initData();
+      populateFilters(allMovies);
+
+      // Apply saved settings
+      const savedUniverse = getSetting('database', 'filterUniverse');
+      const savedPhase    = getSetting('database', 'filterPhase');
+      const savedType     = getSetting('database', 'filterType');
+      const savedSort     = getSetting('database', 'sortOrder');
+      if (savedUniverse) { document.getElementById('filterUniverse').value = savedUniverse; document.getElementById('filterUniverseMobile').value = savedUniverse; }
+      if (savedPhase)    { document.getElementById('filterPhase').value    = savedPhase;    document.getElementById('filterPhaseMobile').value    = savedPhase; }
+      if (savedType)     { document.getElementById('filterType').value     = savedType;     document.getElementById('filterTypeMobile').value     = savedType; }
+      if (savedSort)     { document.getElementById('sortOrder').value      = savedSort;     document.getElementById('sortOrderMobile').value      = savedSort; }
+      updateFilterBadge();
+
+      renderCards();
+      refreshWatchedUI();
+    } catch(err) {
+      document.getElementById('status').textContent = 'Error loading data.';
+      console.error(err);
+    }
+  }
+
+  requireAuth();
+  loadWatched().then(refreshWatchedUI);
+  loadSettings();
+  init();
+
+  // Auto-select collection from URL hash e.g. database.html#collection=avengers_collection
+  window.addEventListener('load', () => {
+    const hash = window.location.hash;
+    const match = hash.match(/collection=([^&]+)/);
+    if (match) {
+      const slugOrGid = match[1];
+      // Look up by slug first, fall back to raw GID
+      const col = COLLECTIONS.find(c => c.slug === slugOrGid || c.gid === slugOrGid);
+      if (col) {
+        const sel = document.getElementById('filterCollection');
+        sel.value = col.gid;
+        if (getCurrentUser()) onCollectionChange();
+      }
+    }
+  });
+</script>
+<footer>
+  <div>
+    <span class="footer-brand">MCU App</span>
+    <span class="footer-copy">Created by Kristijan Korman · Posters from TMDB</span>
+  </div>
+  <div class="footer-links">
+    <a href="index.html">Main</a>
+    <a href="phases.html">Phases</a>
+    <a href="collections.html">Collections</a>
+    <a href="database.html">Database</a>
+  </div>
+  <div class="footer-quote">
+    Assembled with love, coffee, and questionable life choices.<br>
+    Not affiliated with Marvel. Please don't sue.
+  </div>
+</footer>
+</body>
+</html>

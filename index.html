@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MCU App — Main</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons" />
+  <style>
+    .page-section {
+      padding: 24px 24px 0;
+    }
+    .page-section h2 {
+      font-size: 1.2rem;
+      color: #fff;
+      margin-bottom: 4px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid #333;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    @media (max-width: 600px) {
+      .page-section h2 {
+        justify-content: space-between;
+      }
+    }
+    .countdown {
+      font-size: 0.78rem;
+      color: #e50914;
+      font-weight: bold;
+      margin-top: 6px;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="header-left">
+    <button class="hamburger" id="hamburger" onclick="toggleMobileNav()">
+      <span class="material-icons">menu</span>
+    </button>
+    <a class="brand" href="index.html">MCU App</a>
+    <nav>
+      <a href="index.html" class="active">Main</a>
+      <a href="phases.html">Phases</a>
+      <a href="collections.html">Collections</a>
+      <a href="database.html">Database</a>
+    </nav>
+  </div>
+  <div class="header-right">
+    <span class="watched-counter" id="watchedCounter" style="display:none;" onclick="window.location='profile.html'"></span>
+    <div class="user-menu" id="userMenu">
+      <span class="header-username" id="headerUsername" onclick="toggleUserMenu()"></span>
+      <div class="user-dropdown" id="userDropdown">
+        <button onclick="event.stopPropagation();showLogoutModal()">Log out</button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<div class="mobile-nav-backdrop" id="mobileNavBackdrop" onclick="closeMobileNav()"></div>
+<nav class="mobile-nav" id="mobileNav">
+  <div class="mobile-nav-close"><button onclick="closeMobileNav()"><span class="material-icons">close</span></button></div>
+  <a href="index.html" class="active">Main</a>
+  <a href="phases.html">Phases</a>
+  <a href="collections.html">Collections</a>
+  <a href="database.html">Database</a>
+</nav>
+
+<!-- Login modal -->
+<div class="login-overlay" id="loginOverlay">
+  <div class="login-box">
+    <h2>MCU App</h2>
+    <input type="text" id="loginUsername" placeholder="Username" autocomplete="username" />
+    <input type="password" id="loginPassword" placeholder="Password" autocomplete="current-password" />
+    <button onclick="handleLogin()">Sign in</button>
+    <div class="login-error" id="loginError">Incorrect username or password.</div>
+  </div>
+</div>
+
+<!-- Movie modal -->
+<div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
+  <div class="modal">
+    <button class="close-btn" onclick="closeModalBtn()"><span class="close-x">✕</span><span class="close-label"> Close</span></button>
+    <h2 id="modalTitle"></h2>
+    <div class="modal-meta" id="modalMeta"></div>
+    <div class="modal-watched-footer" id="modalWatchedFooter"></div>
+  </div>
+</div>
+<button class="modal-bottom-bar" id="modalBottomBar" style="display:none;" onclick="toggleWatched(this.dataset.watchedId)"></button>
+
+<div id="recentSection" style="display:none;"></div>
+<div id="recentGrid" style="padding: 16px 24px;"></div>
+
+<div class="page-section">
+  <h2>Upcoming Releases <span class="phase-count" id="upcomingCount"></span></h2>
+</div>
+<div class="status" id="status">Loading...</div>
+<div class="grid" id="grid"></div>
+
+<div class="page-section" id="collectionsSection" style="display:none;">
+  <h2>Collections <span class="phase-count"><a href="collections.html" style="color:#888;text-decoration:none;font-size:0.8rem;">View all →</a></span></h2>
+</div>
+<div class="collections-preview" id="collectionsPreview"></div>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="js/config.js"></script>
+<script src="js/users.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/data.js"></script>
+<script src="js/firebase.js"></script>
+<script>
+  function onLoginSuccess() { loadWatched().then(refreshWatchedUI); init(); }
+
+  // getCountdown is defined in data.js
+
+  function makeFeaturedCard(m, firstCol = null) {
+    const tv = isTV(m);
+    const imageId     = getImageId(m);
+    const cachedLocal = posterCache[`local_${imageId}_w300`];
+    const cachedTmdb  = posterCache[`tmdb_${m.Title}_w300`];
+    const cachedUrl   = cachedLocal ? `images/${imageId}_w300.jpg` : (cachedTmdb || null);
+    const posterHtml  = cachedUrl
+      ? `<img class="poster" src="${cachedUrl}" alt="${m.Title}" loading="lazy">`
+      : `<div class="poster-placeholder" data-movieid="${m.ID}" data-cardkey="featured_${m.ID}">🎬</div>`;
+    const collectionHtml = firstCol ? `
+      <div id="featuredCollectionPanel" style="width:220px;min-width:220px;border:1px solid #333;border-radius:6px;padding:20px;display:flex;flex-direction:column;justify-content:center;gap:12px;">
+        <div style="font-size:0.72rem;color:#888;text-transform:uppercase;letter-spacing:1px;">Collection</div>
+        <div style="font-size:1rem;color:#fff;font-weight:bold;line-height:1.3;">${firstCol.name}</div>
+        <button onclick="event.stopPropagation();window.location='collections.html#collection=${firstCol.slug || firstCol.gid}'"
+          style="background:#e50914;border:none;color:#fff;padding:8px 14px;border-radius:4px;cursor:pointer;font-size:0.82rem;font-weight:bold;width:100%;text-align:center;margin-top:auto;">
+          Watch more from ${m.Title}
+        </button>
+      </div>` : `<div id="featuredCollectionPanel"></div>`;
+    return `
+      <div class="card card-featured" onclick="openModal('${m.ID}')">
+        ${posterHtml}
+        <div class="card-info" style="flex:1;display:flex;flex-direction:column;">
+          <div style="display:flex;gap:6px;flex-wrap:wrap;">
+            <div class="badge recent-release" style="margin-bottom:0;">Recent Release</div>
+            ${m.Universe ? `<div class="badge ${getBadgeClass(m.Universe)}" style="margin-bottom:0;">${m.Universe}</div>` : ''}
+            ${(tv && m.Season) ? `<div class="badge season" style="margin-bottom:0;">${m.Season}</div>` : ''}
+          </div>
+          <h3>${m.Title}</h3>
+          <div class="meta">
+            ${m['Release Date'] ? `<span>${m['Release Date']}</span>` : ''}
+          </div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;">
+            ${m.Type ? `<span class="type-tag">${getTypeLabel(m)}</span>` : ''}
+            ${m.Phase ? `<a href="phases.html#${m.Phase.toLowerCase().replace(/\s+/g, '-')}" onclick="event.stopPropagation()" class="type-tag type-tag-link">${m.Phase}</a>` : ''}
+          </div>
+        </div>
+        ${collectionHtml}
+      </div>
+    `;
+  }
+
+  function renderRecentRelease(m) {
+    const collections = movieCollectionMap[m.ID] || [];
+    const firstCol = collections[0] || null;
+
+    // If card already rendered, just update the collection panel in place
+    const existing = document.getElementById('featuredCollectionPanel');
+    if (existing && firstCol) {
+      existing.style.cssText = 'width:220px;min-width:220px;border:1px solid #333;border-radius:6px;padding:20px;display:flex;flex-direction:column;justify-content:center;gap:12px;';
+      existing.innerHTML = `
+        <div style="font-size:0.72rem;color:#888;text-transform:uppercase;letter-spacing:1px;">Collection</div>
+        <div style="font-size:1rem;color:#fff;font-weight:bold;line-height:1.3;">${firstCol.name}</div>
+        <button onclick="event.stopPropagation();window.location='collections.html#collection=${firstCol.slug || firstCol.gid}'"
+          style="background:#e50914;border:none;color:#fff;padding:8px 14px;border-radius:4px;cursor:pointer;font-size:0.82rem;font-weight:bold;width:100%;text-align:center;margin-top:auto;">
+          Watch more from ${m.Title}
+        </button>
+      `;
+      return;
+    }
+
+    document.getElementById('recentGrid').innerHTML = makeFeaturedCard(m, firstCol);
+  }
+
+  function makeCard(m) {
+    const tv = isTV(m);
+    const imageId     = getImageId(m);
+    const cachedLocal = posterCache[`local_${imageId}_w300`];
+    const cachedTmdb  = posterCache[`tmdb_${m.Title}_w300`];
+    const cachedUrl   = cachedLocal ? `images/${imageId}_w300.jpg` : (cachedTmdb || null);
+    const posterHtml  = cachedUrl
+      ? `<img class="poster" src="${cachedUrl}" alt="${m.Title}" loading="lazy">`
+      : `<div class="poster-placeholder" data-movieid="${m.ID}" data-cardkey="${m.ID}">🎬</div>`;
+    const countdown = getCountdown(m);
+    return `
+      <div class="card" onclick="openModal('${m.ID}')">
+        <div class="poster-wrap">${posterHtml}${watchedCardButtonHTML(m.ID)}</div>
+        <div class="card-info">
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;">
+            ${m.ID === recentReleaseId ? `<div class="badge recent-release" style="margin-bottom:0;">Recent Release</div>` : ''}
+            ${m.Universe ? `<div class="badge ${getBadgeClass(m.Universe)}" style="margin-bottom:0;">${m.Universe}</div>` : ''}
+            ${(tv && m.Season) ? `<div class="badge season" style="margin-bottom:0;">${m.Season}</div>` : ''}
+          </div>
+          <h3>${m.Title}</h3>
+          <div class="meta">
+            ${m['Release Date'] ? `<span>${m['Release Date']}</span>` : ''}
+          </div>
+          ${countdown ? `<p class="countdown">${countdown}</p>` : ''}
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">
+            ${m.Type ? `<span class="type-tag">${getTypeLabel(m)}</span>` : ''}
+            ${m.Phase ? `<a href="phases.html#${m.Phase.toLowerCase().replace(/\s+/g, '-')}" onclick="event.stopPropagation()" class="type-tag type-tag-link">${m.Phase}</a>` : ''}
+          </div>
+        </div>
+        ${watchedCardSideButtonHTML(m.ID)}
+      </div>
+    `;
+  }
+
+  async function loadVisiblePosters() {
+    for (const el of Array.from(document.querySelectorAll('.poster-placeholder'))) {
+      const { movieid, cardkey } = el.dataset;
+      const m = allMovies.find(x => x.ID === movieid);
+      if (!m) continue;
+      const url = await getPosterUrl(m, 'w300');
+      const current = document.querySelector(`.poster-placeholder[data-cardkey="${cardkey}"]`);
+      if (!current) continue;
+      if (url) {
+        const img = document.createElement('img');
+        img.className = 'poster';
+        img.src = url;
+        img.alt = m.Title;
+        img.loading = 'lazy';
+        current.replaceWith(img);
+      } else {
+        current.textContent = '🎬';
+      }
+    }
+  }
+
+  async function openModal(id) {
+    const m = allMovies.find(x => x.ID === id);
+    if (!m) return;
+    const posterUrl = await getPosterUrl(m, 'w500');
+    const countdown = getCountdown(m);
+    const cols = movieCollectionMap[m.ID] || [];
+
+    document.getElementById('modalMeta').innerHTML = `
+      ${posterUrl ? `<img src="${posterUrl}" alt="${m.Title}">` : ''}
+      <div class="modal-title-row"><span class="modal-title-inline">${m.Title}</span></div>
+      ${m.Universe ? `<div><strong>Universe:</strong> ${m.Universe}</div>` : ''}
+      ${m.Phase ? `<div><strong>Phase:</strong> <a href="phases.html#${m.Phase.toLowerCase().replace(/\s+/g, '-')}" style="color:#60a5fa;text-decoration:none;">${m.Phase}</a></div>` : ''}
+      ${m.Type ? `<div><strong>Type:</strong> ${getTypeLabel(m)}</div>` : ''}
+      ${m.Season ? `<div><strong>Season:</strong> ${m.Season}</div>` : ''}
+      ${m['Release Date'] ? `<div><strong>Release Date:</strong> ${m['Release Date']}</div>` : ''}
+      ${countdown ? `<div style="color:#e50914;font-weight:bold;">${countdown}</div>` : ''}
+      ${cols.length > 0 ? `
+        <div style="margin-top:14px;padding-top:12px;border-top:1px solid #333;display:flex;flex-wrap:wrap;gap:6px;">
+          <div style="width:100%;"><strong>Collections:</strong></div>
+          ${cols.map(col => `
+            <button class="modal-collection-btn" onclick="window.location='collections.html#collection=${col.slug || col.gid}'">
+              ${col.name}
+            </button>
+          `).join('')}
+        </div>` : ''}
+    `;
+    renderModalWatchedFooter(id);
+    document.getElementById('modalOverlay').classList.add('open');
+    setModalBottomBar(id);
+  }
+
+  function closeModal(e) {
+    if (e.target === document.getElementById('modalOverlay')) closeModalBtn();
+  }
+
+  function closeModalBtn() {
+    document.getElementById('modalOverlay').classList.remove('open');
+    hideModalBottomBar();
+  }
+
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModalBtn(); });
+
+  async function renderCollectionsPreview() {
+    // Shuffle collections randomly, show 4
+    const shuffled = [...COLLECTIONS].sort(() => Math.random() - 0.5).slice(0, 5);
+
+    document.getElementById('collectionsSection').style.display = 'block';
+    const preview = document.getElementById('collectionsPreview');
+
+    preview.innerHTML = shuffled.map(col => `
+      <div class="collection-card" onclick="window.location='collections.html#collection=${col.slug}'">
+        <div class="collection-posters" id="main-posters-${col.gid}">
+          <div class="poster-stub"></div>
+          <div class="poster-stub"></div>
+          <div class="poster-stub"></div>
+          <div class="poster-stub"></div>
+        </div>
+        <div class="collection-name">${col.name}</div>
+        <div class="collection-count" id="main-count-${col.gid}">Loading...</div>
+        <button onclick="event.stopPropagation();window.location='collections.html#collection=${col.slug}'">
+          Open collection
+        </button>
+      </div>
+    `).join('');
+
+    // Load previews in background
+    for (const col of shuffled) {
+      loadCollectionPreview(col);
+    }
+  }
+
+  async function loadCollectionPreview(col) {
+    try {
+      const entries = await loadCollection(col.gid);
+      const countEl = document.getElementById(`main-count-${col.gid}`);
+      if (countEl) countEl.textContent = `${entries.length} titles`;
+
+      // Deduplicate then shuffle, pick 4
+      const unique = [...new Set(entries.map(e => e.id))];
+      const shuffled = unique.sort(() => Math.random() - 0.5);
+      const preview = shuffled.slice(0, 4);
+
+      const postersEl = document.getElementById(`main-posters-${col.gid}`);
+      if (!postersEl) return;
+
+      const imgs = await Promise.all(preview.map(async id => {
+        const m = allMovies.find(x => x.ID === id);
+        return m ? await getPosterUrl(m, 'w300') : null;
+      }));
+
+      postersEl.innerHTML = imgs.map(url =>
+        url ? `<img src="${url}" alt="" loading="lazy">` : `<div class="poster-stub"></div>`
+      ).join('');
+    } catch(e) { /* skip */ }
+  }
+
+  async function init() {
+    try {
+      await initData();
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const upcoming = allMovies
+        .filter(m => {
+          if (!m['Release Date']) return false;
+          const d = new Date(m['Release Date']);
+          return !isNaN(d) && d >= today;
+        })
+        .sort((a, b) => new Date(a['Release Date']) - new Date(b['Release Date']));
+
+      const status = document.getElementById('status');
+      const grid   = document.getElementById('grid');
+
+      status.style.display = 'none';
+      document.getElementById('upcomingCount').textContent = `${upcoming.length} titles`;
+
+      // Find recent release: the entry with a past date closest to the next upcoming
+      const nextUpcoming = upcoming[0];
+      let recentRelease = null;
+      if (nextUpcoming) {
+        const nextDate = new Date(nextUpcoming['Release Date']);
+        const past = allMovies
+          .filter(m => {
+            if (!m['Release Date'] || m.dateIsYearOnly) return false;
+            const d = new Date(m['Release Date']);
+            return !isNaN(d) && d < today;
+          })
+          .sort((a, b) => new Date(b['Release Date']) - new Date(a['Release Date']));
+        recentRelease = past[0] || null;
+      }
+
+      // Render upcoming grid and collections preview immediately
+      if (upcoming.length === 0) {
+        grid.innerHTML = '<div class="empty">No upcoming releases found.</div>';
+      } else {
+        grid.innerHTML = upcoming.map(m => makeCard(m)).join('');
+        loadVisiblePosters();
+      }
+      renderCollectionsPreview();
+      refreshWatchedUI();
+
+      if (recentRelease) {
+        document.getElementById('recentSection').style.display = 'block';
+
+        // Check Firestore cache first
+        const cached = await getCachedRecentRelease();
+
+        if (cached && cached.id === recentRelease.ID) {
+          // Cache hit — render panel instantly (collections may be empty, that's valid)
+          movieCollectionMap[recentRelease.ID] = cached.collections || [];
+          renderRecentRelease(recentRelease);
+          loadVisiblePosters();
+          // Still load all collections in background for modal buttons
+          loadAllCollections();
+        } else {
+          // Cache miss or stale — render card first without panel
+          renderRecentRelease(recentRelease);
+          loadVisiblePosters();
+          // Load all collections, then update panel and write cache
+          await loadAllCollections();
+          const cols = movieCollectionMap[recentRelease.ID] || [];
+          // Write cache regardless of whether cols is empty — empty is a valid cached result
+          setCachedRecentRelease(recentRelease.ID, cols);
+          if (cols.length > 0) renderRecentRelease(recentRelease);
+        }
+      }
+
+    } catch(err) {
+      document.getElementById('status').textContent = 'Error loading data.';
+      console.error(err);
+    }
+  }
+
+  requireAuth();
+  loadWatched().then(refreshWatchedUI);
+  init();
+</script>
+<footer>
+  <div>
+    <span class="footer-brand">MCU App</span>
+    <span class="footer-copy">Created by Kristijan Korman · Posters from TMDB</span>
+  </div>
+  <div class="footer-links">
+    <a href="index.html">Main</a>
+    <a href="phases.html">Phases</a>
+    <a href="collections.html">Collections</a>
+    <a href="database.html">Database</a>
+  </div>
+  <div class="footer-quote">
+    Assembled with love, coffee, and questionable life choices.<br>
+    Not affiliated with Marvel. Please don't sue.
+  </div>
+</footer>
+</body>
+</html>
