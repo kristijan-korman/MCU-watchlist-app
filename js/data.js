@@ -160,7 +160,7 @@ async function getPosterUrl(m, size = 'w300') {
     }
   }
 
-  const cacheKey = `tmdb_${m.Title}_${size}`;
+  const cacheKey = `tmdb_${m.ID}_${size}`;
   if (posterCache[cacheKey] !== undefined) return posterCache[cacheKey];
   try {
     const endpoint = isTV(m) ? 'search/tv' : 'search/movie';
@@ -222,6 +222,50 @@ function getBadgeClass(universe) {
   if (u.includes('fox'))     return 'fox';
   if (u.includes('netflix')) return 'netflix';
   return 'other';
+}
+
+// ─── Smart search fallback ───
+// Returns up to `limit` movies from allMovies matching the query,
+// excluding any IDs already shown in the current filtered result.
+function globalSearch(query, excludeIds = []) {
+  if (!query || query.length < 2) return [];
+  const q = query.toLowerCase();
+  return allMovies
+    .filter(m => !excludeIds.includes(m.ID) && m.Title.toLowerCase().includes(q));
+}
+
+// Renders a "Did you mean?" suggestion block into a container element.
+// Call this when a page's filtered results are empty but the search query is non-empty.
+function renderSmartSearchSuggestions(containerEl, query, excludeIds = []) {
+  const matches = globalSearch(query, excludeIds);
+  if (matches.length === 0) return false;
+  containerEl.innerHTML = `
+    <div class="smart-search-suggestions">
+      <div class="smart-search-label">Not found here — did you mean:</div>
+      <div class="smart-search-grid">
+        ${matches.map(m => `
+          <button class="smart-search-item" onclick="openModal('${m.ID}')" data-suggest-id="${m.ID}">
+            <div class="smart-search-poster-placeholder" id="suggest-poster-${m.ID}">🎬</div>
+            <span class="smart-search-title">${m.Title}${m.Season ? ' · ' + m.Season : ''}</span>
+          </button>
+        `).join('')}
+      </div>
+    </div>
+  `;
+  // Load posters async
+  matches.forEach(async m => {
+    const url = await getPosterUrl(m, 'w300');
+    const el = document.getElementById(`suggest-poster-${m.ID}`);
+    if (!el) return;
+    if (url) {
+      const img = document.createElement('img');
+      img.className = 'smart-search-poster';
+      img.src = url;
+      img.alt = m.Title;
+      el.replaceWith(img);
+    }
+  });
+  return true;
 }
 
 // ─── Init shared data ───

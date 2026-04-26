@@ -105,6 +105,7 @@
     <div class="user-menu" id="userMenu">
       <span class="header-username" id="headerUsername" onclick="toggleUserMenu()"></span>
       <div class="user-dropdown" id="userDropdown">
+        <button onclick="window.location='profile.html'">Profile</button>
         <button onclick="event.stopPropagation();showLogoutModal()">Log out</button>
       </div>
     </div>
@@ -135,7 +136,6 @@
 <div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
   <div class="modal">
     <button class="close-btn" onclick="closeModalBtn()"><span class="close-x">✕</span><span class="close-label"> Close</span></button>
-    <h2 id="modalTitle"></h2>
     <div class="modal-meta" id="modalMeta"></div>
     <div class="modal-watched-footer" id="modalWatchedFooter"></div>
   </div>
@@ -207,7 +207,7 @@
   }
 
   function closeModal(e) { if (e.target === document.getElementById('modalOverlay')) closeModalBtn(); }
-  function closeModalBtn() { document.getElementById('modalOverlay').classList.remove('open'); hideModalBottomBar(); }
+  function closeModalBtn() { _animatedModalClose(); }
   document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModalBtn(); });
 
   // ─── Poster loading ───

@@ -84,7 +84,6 @@
 <div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
   <div class="modal">
     <button class="close-btn" onclick="closeModalBtn()"><span class="close-x">✕</span><span class="close-label"> Close</span></button>
-    <h2 id="modalTitle"></h2>
     <div class="modal-meta" id="modalMeta"></div>
     <div class="modal-watched-footer" id="modalWatchedFooter"></div>
   </div>
@@ -270,10 +269,7 @@
     if (e.target === document.getElementById('modalOverlay')) closeModalBtn();
   }
 
-  function closeModalBtn() {
-    document.getElementById('modalOverlay').classList.remove('open');
-    hideModalBottomBar();
-  }
+  function closeModalBtn() { _animatedModalClose(); }
 
   document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModalBtn(); });
 

@@ -128,12 +128,14 @@
 
     .filter-sheet-group select {
       width: 100%;
-      background: #222;
+      background: #222 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23aaa' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat right 12px center;
       border: 1px solid #444;
       color: #eee;
-      padding: 10px 12px;
+      padding: 10px 36px 10px 12px;
       border-radius: 6px;
       font-size: 0.9rem;
+      appearance: none;
+      -webkit-appearance: none;
     }
     .filter-sheet-group select:focus { outline: none; border-color: #e50914; }
 
@@ -190,7 +192,7 @@
 </nav>
 
 <div class="controls">
-  <input type="text" id="search" placeholder="Search titles..." oninput="renderCards()" />
+  <input type="text" id="search" placeholder="Search titles..." oninput="debouncedRender()" />
   <!-- Desktop filters -->
   <select id="filterUniverse" onchange="updateFilterBadge();renderCards()" class="desktop-filter">
     <option value="">All Universes</option>
@@ -268,7 +270,6 @@
 <div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
   <div class="modal">
     <button class="close-btn" onclick="closeModalBtn()"><span class="close-x">✕</span><span class="close-label"> Close</span></button>
-    <h2 id="modalTitle"></h2>
     <div class="modal-meta" id="modalMeta"></div>
     <div class="modal-watched-footer" id="modalWatchedFooter"></div>
   </div>
@@ -295,6 +296,11 @@
 <script src="js/firebase.js"></script>
 <script>
   let activeCollectionIds = null;
+  let _searchDebounceTimer = null;
+  function debouncedRender() {
+    clearTimeout(_searchDebounceTimer);
+    _searchDebounceTimer = setTimeout(renderCards, 250);
+  }
 
   function onLoginSuccess() { loadWatched().then(refreshWatchedUI); init(); }
 
@@ -492,6 +498,7 @@
     }
 
     if (displayList.length === 0) {
+      if (search && renderSmartSearchSuggestions(grid, search, [])) return;
       grid.innerHTML = '<div class="empty">No results found.</div>';
       return;
     }
@@ -519,7 +526,7 @@
             <div class="meta">
               ${m['Release Date'] ? `<span>${m['Release Date']}</span>` : ''}
             </div>
-            ${getCountdown(m) ? `<p class="countdown">${getCountdown(m)}</p>` : ''}
+            ${(() => { const cd = getCountdown(m); return cd ? `<p class="countdown">${cd}</p>` : ''; })()}
             ${desc ? `<p class="card-desc">${desc}</p>` : ''}
             <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">
               ${m.Type ? `<span class="type-tag">${getTypeLabel(m)}</span>` : ''}
@@ -538,6 +545,7 @@
     const m = allMovies.find(x => x.ID === id);
     if (!m) return;
     const posterUrl = await getPosterUrl(m, 'w500');
+    const countdown = getCountdown(m);
 
     document.getElementById('modalMeta').innerHTML = `
       ${posterUrl ? `<img src="${posterUrl}" alt="${m.Title}">` : ''}
@@ -547,7 +555,7 @@
       ${m.Type ? `<div><strong>Type:</strong> ${getTypeLabel(m)}</div>` : ''}
       ${m.Season ? `<div><strong>Season:</strong> ${m.Season}</div>` : ''}
       ${m['Release Date'] ? `<div><strong>Release Date:</strong> ${m['Release Date']}</div>` : ''}
-      ${getCountdown(m) ? `<div style="color:#e50914;font-weight:bold;">${getCountdown(m)}</div>` : ''}
+      ${countdown ? `<div style="color:#e50914;font-weight:bold;">${countdown}</div>` : ''}
       ${desc ? `<div style="margin-top:12px;padding-top:12px;border-top:1px solid #333;color:#ccc;line-height:1.5;">${desc}</div>` : ''}
       ${(movieCollectionMap[m.ID] && movieCollectionMap[m.ID].length > 0) ? `
         <div style="margin-top:14px;padding-top:12px;border-top:1px solid #333;display:flex;flex-wrap:wrap;gap:6px;">
@@ -575,10 +583,7 @@
     if (e.target === document.getElementById('modalOverlay')) closeModalBtn();
   }
 
-  function closeModalBtn() {
-    document.getElementById('modalOverlay').classList.remove('open');
-    hideModalBottomBar();
-  }
+  function closeModalBtn() { _animatedModalClose(); }
 
   document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModalBtn(); });
 

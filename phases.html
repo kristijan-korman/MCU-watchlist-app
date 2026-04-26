@@ -7,6 +7,163 @@
   <link rel="stylesheet" href="css/style.css" />
   <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons" />
   <style>
+    /* ── Mobile filter button ── */
+    .mobile-filter-btn {
+      display: none;
+      align-items: center;
+      gap: 6px;
+      background: #222;
+      border: 1px solid #444;
+      color: #eee;
+      padding: 7px 12px;
+      border-radius: 4px;
+      font-size: 0.85rem;
+      cursor: pointer;
+      position: relative;
+    }
+    .mobile-filter-btn .material-icons { font-size: 18px; }
+    .mobile-filter-btn.active { border-color: #e50914; color: #fff; }
+
+    .mobile-filter-badge {
+      position: absolute;
+      top: -6px;
+      right: -6px;
+      background: #e50914;
+      color: #fff;
+      font-size: 0.65rem;
+      font-weight: bold;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    @media (max-width: 600px) {
+      .desktop-filter { display: none !important; }
+      .mobile-filter-btn { display: flex; }
+      .controls #search { flex: 1; }
+      .controls .view-toggle { margin-left: auto; }
+    }
+
+    /* ── Filter bottom sheet ── */
+    .filter-sheet-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.6);
+      z-index: 300;
+    }
+    .filter-sheet-backdrop.open { display: block; }
+
+    .filter-sheet {
+      position: fixed;
+      bottom: -100%;
+      left: 0;
+      right: 0;
+      background: #1a1a1a;
+      border-radius: 16px 16px 0 0;
+      border-top: 1px solid #333;
+      z-index: 301;
+      padding: 0 0 32px;
+      transition: bottom 0.3s ease;
+      max-height: 85vh;
+      overflow-y: auto;
+    }
+    .filter-sheet.open { bottom: 0; }
+
+    .filter-sheet-handle {
+      width: 36px;
+      height: 4px;
+      background: #444;
+      border-radius: 2px;
+      margin: 12px auto 0;
+    }
+
+    .filter-sheet-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 20px 12px;
+      border-bottom: 1px solid #2a2a2a;
+    }
+    .filter-sheet-header span {
+      font-size: 1rem;
+      font-weight: bold;
+      color: #fff;
+    }
+    .filter-sheet-header button {
+      background: none;
+      border: none;
+      color: #e50914;
+      font-size: 0.85rem;
+      cursor: pointer;
+      padding: 0;
+    }
+
+    .filter-sheet-body {
+      padding: 8px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .filter-sheet-group {
+      padding: 12px 0;
+      border-bottom: 1px solid #2a2a2a;
+    }
+    .filter-sheet-group:last-child { border-bottom: none; }
+
+    .filter-sheet-group label {
+      display: block;
+      font-size: 0.75rem;
+      color: #888;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 8px;
+    }
+
+    .filter-sheet-group select {
+      width: 100%;
+      background: #222 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23aaa' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat right 12px center;
+      border: 1px solid #444;
+      color: #eee;
+      padding: 10px 36px 10px 12px;
+      border-radius: 6px;
+      font-size: 0.9rem;
+      appearance: none;
+      -webkit-appearance: none;
+    }
+    .filter-sheet-group select:focus { outline: none; border-color: #e50914; }
+
+    .filter-sheet-toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 0;
+      border-bottom: 1px solid #2a2a2a;
+      font-size: 0.9rem;
+      color: #eee;
+    }
+    .filter-sheet-toggle-row:last-child { border-bottom: none; }
+
+    .filter-sheet-footer {
+      padding: 16px 20px 0;
+    }
+    .filter-sheet-footer button {
+      width: 100%;
+      background: #e50914;
+      border: none;
+      color: #fff;
+      padding: 14px;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    .filter-sheet-footer button:hover { background: #c0070f; }
+
     .phase-section {
       padding: 32px 24px 0;
     }
@@ -62,6 +219,7 @@
     <div class="user-menu" id="userMenu">
       <span class="header-username" id="headerUsername" onclick="toggleUserMenu()"></span>
       <div class="user-dropdown" id="userDropdown">
+        <button onclick="window.location='profile.html'">Profile</button>
         <button onclick="event.stopPropagation();showLogoutModal()">Log out</button>
       </div>
     </div>
@@ -92,7 +250,6 @@
 <div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
   <div class="modal">
     <button class="close-btn" onclick="closeModalBtn()"><span class="close-x">✕</span><span class="close-label"> Close</span></button>
-    <h2 id="modalTitle"></h2>
     <div class="modal-meta" id="modalMeta"></div>
     <div class="modal-watched-footer" id="modalWatchedFooter"></div>
   </div>
@@ -100,22 +257,61 @@
 <button class="modal-bottom-bar" id="modalBottomBar" style="display:none;" onclick="toggleWatched(this.dataset.watchedId)"></button>
 
 <div class="controls">
-  <input type="text" id="search" placeholder="Search titles..." oninput="renderPhases()" />
-  <select id="sortOrder" onchange="renderPhases()">
+  <input type="text" id="search" placeholder="Search titles..." oninput="debouncedRender()" />
+  <!-- Desktop filters -->
+  <select id="sortOrder" onchange="updateFilterBadge();renderPhases()" class="desktop-filter">
     <option value="newest">Newest first</option>
     <option value="oldest">Oldest first</option>
   </select>
-  <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:0.85rem;color:#aaa;white-space:nowrap;user-select:none;">
+  <label class="desktop-filter" style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:0.85rem;color:#aaa;white-space:nowrap;user-select:none;">
     <div style="position:relative;display:inline-block;width:44px;height:24px;flex-shrink:0;">
-      <input type="checkbox" id="moviesOnly" onchange="renderPhases()" style="opacity:0;width:0;height:0;position:absolute;">
+      <input type="checkbox" id="moviesOnly" onchange="updateFilterBadge();renderPhases()" style="opacity:0;width:0;height:0;position:absolute;">
       <span id="moviesOnlyTrack" style="position:absolute;inset:0;background:#444;border-radius:24px;transition:background 0.2s;"></span>
       <span id="moviesOnlyThumb" style="position:absolute;top:3px;left:3px;width:18px;height:18px;background:#fff;border-radius:50%;transition:transform 0.2s;"></span>
     </div>
     Movies only
   </label>
+  <!-- Mobile filter button -->
+  <button class="mobile-filter-btn" id="mobileFilterBtn" onclick="openFilterSheet()">
+    <span class="material-icons">tune</span>
+    <span>Filters</span>
+    <span class="mobile-filter-badge" id="mobileFilterBadge" style="display:none;"></span>
+  </button>
   <div class="view-toggle" style="margin-left:auto;">
     <button id="btnCard" class="active" onclick="setView('card')" title="Card view">⊞</button>
     <button id="btnList" onclick="setView('list')" title="List view">☰</button>
+  </div>
+</div>
+
+<!-- Mobile filter bottom sheet -->
+<div class="filter-sheet-backdrop" id="filterSheetBackdrop" onclick="closeFilterSheet()"></div>
+<div class="filter-sheet" id="filterSheet">
+  <div class="filter-sheet-handle"></div>
+  <div class="filter-sheet-header">
+    <span>Filters</span>
+    <button onclick="clearFilters()">Clear all</button>
+  </div>
+  <div class="filter-sheet-body">
+    <div class="filter-sheet-group">
+      <label>Sort order</label>
+      <select id="sortOrderMobile" onchange="syncAndRender('sortOrder','sortOrderMobile')">
+        <option value="newest">Newest first</option>
+        <option value="oldest">Oldest first</option>
+      </select>
+    </div>
+    <div class="filter-sheet-toggle-row">
+      <span>Movies only</span>
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none;">
+        <div style="position:relative;display:inline-block;width:44px;height:24px;flex-shrink:0;">
+          <input type="checkbox" id="moviesOnlyMobile" onchange="syncToggleAndRender()" style="opacity:0;width:0;height:0;position:absolute;">
+          <span id="moviesOnlyTrackMobile" style="position:absolute;inset:0;background:#444;border-radius:24px;transition:background 0.2s;"></span>
+          <span id="moviesOnlyThumbMobile" style="position:absolute;top:3px;left:3px;width:18px;height:18px;background:#fff;border-radius:50%;transition:transform 0.2s;"></span>
+        </div>
+      </label>
+    </div>
+  </div>
+  <div class="filter-sheet-footer">
+    <button onclick="closeFilterSheet()">Show results</button>
   </div>
 </div>
 
@@ -159,7 +355,7 @@
           <div class="meta">
             ${m['Release Date'] ? `<span>${m['Release Date']}</span>` : ''}
           </div>
-          ${getCountdown(m) ? `<p class="countdown">${getCountdown(m)}</p>` : ''}
+          ${(() => { const cd = getCountdown(m); return cd ? `<p class="countdown">${cd}</p>` : ''; })()}
           <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">
             ${m.Type ? `<span class="type-tag">${getTypeLabel(m)}</span>` : ''}
           </div>
@@ -193,6 +389,7 @@
   async function openModal(id) {
     const m = allMovies.find(x => x.ID === id);
     if (!m) return;
+    const countdown = getCountdown(m);
     const posterUrl = await getPosterUrl(m, 'w500');
 
     document.getElementById('modalMeta').innerHTML = `
@@ -203,7 +400,7 @@
       ${m.Type ? `<div><strong>Type:</strong> ${getTypeLabel(m)}</div>` : ''}
       ${m.Season ? `<div><strong>Season:</strong> ${m.Season}</div>` : ''}
       ${m['Release Date'] ? `<div><strong>Release Date:</strong> ${m['Release Date']}</div>` : ''}
-      ${getCountdown(m) ? `<div style="color:#e50914;font-weight:bold;">${getCountdown(m)}</div>` : ''}
+      ${countdown ? `<div style="color:#e50914;font-weight:bold;">${countdown}</div>` : ''}
       ${(movieCollectionMap[m.ID] && movieCollectionMap[m.ID].length > 0) ? `
         <div style="margin-top:14px;padding-top:12px;border-top:1px solid #333;display:flex;flex-wrap:wrap;gap:6px;">
           <div style="width:100%;"><strong>Collections:</strong></div>
@@ -231,16 +428,78 @@
     if (e.target === document.getElementById('modalOverlay')) closeModalBtn();
   }
 
-  function closeModalBtn() {
-    document.getElementById('modalOverlay').classList.remove('open');
-    hideModalBottomBar();
-  }
+  function closeModalBtn() { _animatedModalClose(); }
 
   document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModalBtn(); });
 
   let phaseMap = {};
   let phaseOrder = [];
   let currentView = 'card';
+
+  // ── Debounce ──
+  let _searchDebounceTimer = null;
+  function debouncedRender() {
+    clearTimeout(_searchDebounceTimer);
+    _searchDebounceTimer = setTimeout(renderPhases, 250);
+  }
+
+  // ── Filter sheet ──
+  function updateFilterBadge() {
+    const moviesOnly = document.getElementById('moviesOnly').checked;
+    const sortChanged = document.getElementById('sortOrder').value !== 'newest';
+    const count = (moviesOnly ? 1 : 0) + (sortChanged ? 1 : 0);
+    const badge = document.getElementById('mobileFilterBadge');
+    const btn = document.getElementById('mobileFilterBtn');
+    badge.style.display = count > 0 ? 'flex' : 'none';
+    badge.textContent = count;
+    btn.classList.toggle('active', count > 0);
+  }
+
+  function openFilterSheet() {
+    document.getElementById('sortOrderMobile').value = document.getElementById('sortOrder').value;
+    const checked = document.getElementById('moviesOnly').checked;
+    document.getElementById('moviesOnlyMobile').checked = checked;
+    syncToggleVisual('moviesOnlyThumbMobile', 'moviesOnlyTrackMobile', checked);
+    document.getElementById('filterSheet').classList.add('open');
+    document.getElementById('filterSheetBackdrop').classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+
+  function closeFilterSheet() {
+    document.getElementById('filterSheet').classList.remove('open');
+    document.getElementById('filterSheetBackdrop').classList.remove('open');
+    document.body.style.overflow = '';
+  }
+
+  function syncAndRender(desktopId, mobileId) {
+    document.getElementById(desktopId).value = document.getElementById(mobileId).value;
+    updateFilterBadge();
+    renderPhases();
+  }
+
+  function syncToggleAndRender() {
+    const checked = document.getElementById('moviesOnlyMobile').checked;
+    document.getElementById('moviesOnly').checked = checked;
+    syncToggleVisual('moviesOnlyThumbMobile', 'moviesOnlyTrackMobile', checked);
+    updateFilterBadge();
+    renderPhases();
+  }
+
+  function syncToggleVisual(thumbId, trackId, checked) {
+    document.getElementById(thumbId).style.transform = checked ? 'translateX(20px)' : 'translateX(0)';
+    document.getElementById(trackId).style.background = checked ? '#e50914' : '#444';
+  }
+
+  function clearFilters() {
+    document.getElementById('sortOrder').value = 'newest';
+    document.getElementById('sortOrderMobile').value = 'newest';
+    document.getElementById('moviesOnly').checked = false;
+    document.getElementById('moviesOnlyMobile').checked = false;
+    syncToggleVisual('moviesOnlyThumb', 'moviesOnlyTrack', false);
+    syncToggleVisual('moviesOnlyThumbMobile', 'moviesOnlyTrackMobile', false);
+    updateFilterBadge();
+    renderPhases();
+  }
 
   function setView(view) {
     currentView = view;
@@ -266,14 +525,11 @@
     saveSetting('phases', 'moviesOnly', moviesOnly);
 
     // Sync movies-only toggle visual
-    const thumb = document.getElementById('moviesOnlyThumb');
-    const track = document.getElementById('moviesOnlyTrack');
-    thumb.style.transform = moviesOnly ? 'translateX(20px)' : 'translateX(0)';
-    track.style.background = moviesOnly ? '#e50914' : '#444';
+    syncToggleVisual('moviesOnlyThumb', 'moviesOnlyTrack', moviesOnly);
 
     const orderedPhases = sortOldest ? phaseOrder : [...phaseOrder].reverse();
     const container = document.getElementById('phasesContainer');
-    container.innerHTML = orderedPhases.map(phase => {
+    const renderedPhases = orderedPhases.map(phase => {
       const movies = phaseMap[phase]
         .filter(m => {
           if (search && !m.Title.toLowerCase().includes(search)) return false;
@@ -294,7 +550,17 @@
           </div>
         </div>
       `;
-    }).join('');
+    });
+
+    if (renderedPhases.every(s => s === '')) {
+      if (search && renderSmartSearchSuggestions(container, search, [])) {
+        return;
+      }
+      container.innerHTML = '<div class="status">No results found.</div>';
+      return;
+    }
+
+    container.innerHTML = renderedPhases.join('');
     document.querySelectorAll('.phase-grid').forEach(g => g.classList.toggle('list-view', currentView === 'list'));
     loadVisiblePosters();
   }
@@ -332,6 +598,7 @@
       if (savedSort) document.getElementById('sortOrder').value = savedSort;
       if (savedMoviesOnly !== null) document.getElementById('moviesOnly').checked = savedMoviesOnly;
 
+      updateFilterBadge();
       renderPhases();
       refreshWatchedUI();
 

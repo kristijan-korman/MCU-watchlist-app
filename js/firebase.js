@@ -78,8 +78,9 @@ async function toggleWatched(movieId) {
   const user = getCurrentUser();
   if (!user) { showLoginModal(); return; }
 
+  const wasWatched = isWatched(movieId);
   const ref = db.collection('users').doc(user).collection('watched').doc(movieId);
-  if (isWatched(movieId)) {
+  if (wasWatched) {
     watchedSet.delete(movieId);
     await ref.delete();
   } else {
@@ -88,9 +89,36 @@ async function toggleWatched(movieId) {
   }
 
   _saveWatchedToCache(user, watchedSet);
-
-  // Refresh all watched buttons and the progress counter
   refreshWatchedUI();
+
+  // When marking as watched: close modal after delay, then show toast
+  if (!wasWatched) {
+    const m = (typeof allMovies !== 'undefined') && allMovies.find(x => x.ID === movieId);
+    const title = m ? m.Title : movieId;
+    setTimeout(() => {
+      _animatedModalClose(() => _showWatchedToast(`"${title}" marked as watched`));
+    }, 600);
+  }
+}
+
+function _showWatchedToast(message) {
+  let toast = document.getElementById('watchedToast');
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.id = 'watchedToast';
+    toast.className = 'watched-toast';
+    document.body.appendChild(toast);
+  }
+  toast.textContent = message;
+  // Reset animation if already showing
+  toast.classList.remove('show');
+  clearTimeout(toast._hideTimer);
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      toast.classList.add('show');
+      toast._hideTimer = setTimeout(() => toast.classList.remove('show'), 3000);
+    });
+  });
 }
 
 // ─── UI refresh ───
@@ -247,6 +275,18 @@ async function setCachedRecentRelease(movieId, collections) {
   }
 }
 
+// ─── Animated modal close ───
+function _animatedModalClose(callback) {
+  const overlay = document.getElementById('modalOverlay');
+  if (!overlay) { if (callback) callback(); return; }
+  overlay.classList.add('closing');
+  setTimeout(() => {
+    overlay.classList.remove('open', 'closing');
+    hideModalBottomBar();
+    if (callback) callback();
+  }, 200);
+}
+
 // ─── Render helper ───
 // Returns the HTML for a watched button for a given movie ID.
 // Pages call this inside their card/modal render functions.
@@ -289,11 +329,6 @@ function watchedCardSideButtonHTML(movieId) {
     title="${watched ? 'Mark as unwatched' : 'Mark as watched'}"
     aria-pressed="${watched}"
   ><span class="material-icons">${watched ? 'check' : 'radio_button_unchecked'}</span></button>`;
-}
-
-// Renders watched button into the modal footer div (desktop) — returns empty string (button is placed in footer)
-function watchedButtonHTML(movieId) {
-  return ''; // button is rendered via renderModalWatchedFooter
 }
 
 function renderModalWatchedFooter(movieId) {
