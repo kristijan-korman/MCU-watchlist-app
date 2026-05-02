@@ -1278,9 +1278,9 @@ footer .footer-quote {
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  border: none;
-  background: rgba(20,60,20,0.75);
-  color: #4ade80;
+  border: 2px solid #fff;
+  background: transparent;
+  color: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1296,10 +1296,10 @@ footer .footer-quote {
   line-height: 1;
 }
 
-
 .watched-card-btn.watched {
   background: #4ade80;
-  color: #000;
+  border-color: #064e3b;
+  color: #064e3b;
 }
 
 
@@ -1348,9 +1348,9 @@ footer .footer-quote {
   width: 100%;
   height: 56px;
   border: none;
-  border-top: 1px solid #2d7a2d;
-  background: #1a3a1a;
-  color: #4ade80;
+  border-top: 2px solid #fff;
+  background: transparent;
+  color: #fff;
   font-size: 0.95rem;
   font-weight: bold;
   align-items: center;
@@ -1364,12 +1364,12 @@ footer .footer-quote {
 
 .modal-bottom-bar.watched {
   background: #4ade80;
-  color: #000;
-  border-top-color: #4ade80;
+  color: #064e3b;
+  border-top-color: #064e3b;
 }
 
 .modal-bottom-bar .material-icons {
-  font-size: 22px;
+  font-size: 26px;
 }
 
 .modal-bottom-bar .watched-modal-label {
@@ -1384,7 +1384,7 @@ footer .footer-quote {
 }
 
 .modal-watched-footer:not(:empty) {
-  border-top: 1px solid #2d7a2d;
+  border-top: none;
 }
 
 .watched-modal-btn {
@@ -1395,9 +1395,10 @@ footer .footer-quote {
   width: 100%;
   height: 52px;
   border: none;
+  border-top: 2px solid #fff;
   border-radius: 0 0 8px 8px;
-  background: #1a3a1a;
-  color: #4ade80;
+  background: transparent;
+  color: #fff;
   font-size: 0.95rem;
   font-weight: bold;
   cursor: pointer;
@@ -1406,17 +1407,13 @@ footer .footer-quote {
 
 .watched-modal-btn.watched {
   background: #4ade80;
-  color: #000;
+  border-top-color: #064e3b;
+  color: #064e3b;
 }
 
 .watched-modal-btn .material-icons {
   font-size: 22px;
   line-height: 1;
-}
-
-.watched-modal-btn.watched {
-  background: #4ade80;
-  color: #000;
 }
 
 /* ─── Watched counter in header ─── */
@@ -1464,9 +1461,9 @@ footer .footer-quote {
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  border: none;
-  background: #1a3a1a;
-  color: #4ade80;
+  border: 2px solid #fff;
+  background: transparent;
+  color: #fff;
   align-items: center;
   justify-content: center;
   cursor: pointer;
@@ -1482,7 +1479,8 @@ footer .footer-quote {
 
 .watched-card-side-btn.watched {
   background: #4ade80;
-  color: #000;
+  border-color: #064e3b;
+  color: #064e3b;
 }
 
 /* Show side button + hide overlay button in list view */

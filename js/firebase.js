@@ -141,7 +141,7 @@ function refreshWatchedUI() {
     btn.title = watched ? 'Mark as unwatched' : 'Mark as watched';
     btn.setAttribute('aria-pressed', watched);
     const icon = btn.querySelector('.material-icons');
-    if (icon) icon.textContent = watched ? 'check' : 'radio_button_unchecked';
+    if (icon) icon.textContent = 'check';
     const label = btn.querySelector('.watched-label, .watched-modal-label');
     if (label) label.textContent = watched ? 'Watched' : 'Mark as watched';
   });
@@ -159,7 +159,7 @@ function refreshWatchedUI() {
     const id = bar.dataset.watchedId;
     const watched = isWatched(id);
     bar.className = `modal-bottom-bar${watched ? ' watched' : ''}`;
-    bar.innerHTML = `<span class="material-icons">${watched ? 'check' : 'radio_button_unchecked'}</span><span class="watched-modal-label">${watched ? 'Watched' : 'Mark as watched'}</span>`;
+    bar.innerHTML = `<span class="material-icons">check</span><span class="watched-modal-label">${watched ? 'Watched' : 'Mark as watched'}</span>`;
   }
 
   // Update progress counter
@@ -314,7 +314,7 @@ function watchedCardButtonHTML(movieId) {
     onclick="event.stopPropagation(); toggleWatched('${movieId}')"
     title="${watched ? 'Mark as unwatched' : 'Mark as watched'}"
     aria-pressed="${watched}"
-  ><span class="material-icons">${watched ? 'check' : 'radio_button_unchecked'}</span></button>`;
+  ><span class="material-icons">check</span></button>`;
 }
 
 // Round button as a flex sibling on the right — shown in list/mobile view only
@@ -328,7 +328,7 @@ function watchedCardSideButtonHTML(movieId) {
     onclick="event.stopPropagation(); toggleWatched('${movieId}')"
     title="${watched ? 'Mark as unwatched' : 'Mark as watched'}"
     aria-pressed="${watched}"
-  ><span class="material-icons">${watched ? 'check' : 'radio_button_unchecked'}</span></button>`;
+  ><span class="material-icons">check</span></button>`;
 }
 
 function renderModalWatchedFooter(movieId) {
@@ -347,7 +347,7 @@ function renderModalWatchedFooter(movieId) {
     onclick="event.stopPropagation(); toggleWatched('${movieId}')"
     title="${watched ? 'Mark as unwatched' : 'Mark as watched'}"
     aria-pressed="${watched}"
-  ><span class="material-icons">${watched ? 'check' : 'radio_button_unchecked'}</span><span class="watched-modal-label">${watched ? 'Watched' : 'Mark as watched'}</span></button>`;
+  ><span class="material-icons">check</span><span class="watched-modal-label">${watched ? 'Watched' : 'Mark as watched'}</span></button>`;
 }
 
 // Called by openModal on each page to sync the mobile bottom bar
@@ -361,7 +361,7 @@ function setModalBottomBar(movieId) {
   const watched = isWatched(movieId);
   bar.className = `modal-bottom-bar${watched ? ' watched' : ''}`;
   bar.dataset.watchedId = movieId;
-  bar.innerHTML = `<span class="material-icons">${watched ? 'check' : 'radio_button_unchecked'}</span><span class="watched-modal-label">${watched ? 'Watched' : 'Mark as watched'}</span>`;
+  bar.innerHTML = `<span class="material-icons">check</span><span class="watched-modal-label">${watched ? 'Watched' : 'Mark as watched'}</span>`;
   bar.style.display = 'flex';
 }
 
